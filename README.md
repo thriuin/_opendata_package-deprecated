@@ -1,5 +1,5 @@
-od_package
-==========
+opendata_package
+================
 
 This Drupal 7 module is used to link nodes in Drupal 7 to CKAN packages.
 
@@ -15,7 +15,9 @@ does not exist in "od_package" they will be informed that the dataset does not e
 
 If a new node is created, then the user is redirected to the correct node.
 
-After installing the module, be sure to copy the node--od_package.tpl.php file to the
-correct theme directory.
+After installing the module, be sure to copy the node--opendata_package.tpl.php file to the
+correct theme directory. 
 
+At this time, also be sure to enable content translation on the content type and hide the
+language selection field.
 
