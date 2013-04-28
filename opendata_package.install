@@ -1,0 +1,62 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+
+function opendata_package_schema() {
+  $schema = array();
+
+  $schema['opendata_package'] = array(
+    'description' => 'The base table for CKAN Packages maintained by CKAN.',
+    'fields' => array(
+      'pkg_id' => array(
+        'description' => 'CKAN Package ID.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkg_node_id' => array(
+        'description' => 'Node ID.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+      'pkg_name' => array(
+        'description' => 'CKAN Package Name.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkg_title_en' => array(
+        'description' => 'CKAN Package English Title.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkg_title_fr' => array(
+        'description' => 'CKAN Package French Title.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkg_description_en' => array(
+        'description' => 'CKAN Package English Description.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pkg_description_fr' => array(
+        'description' => 'CKAN Package French Description.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array(
+      'pkg_id',
+    ),
+  );
+
+  return $schema;
+}

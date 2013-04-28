@@ -1,0 +1,192 @@
+<?php
+
+/**
+ * @file
+ * Module file for Open Data Canada module.
+ *
+ * This module defines a Drupal content node that mirrors the
+ * packages in CKAN. Instead of querying CKAN directly, basic package
+ * information is stored in the table opendata_package.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function opendata_package_menu() {
+  $items['dataset/%'] = array(
+    'page callback' => '_opendata_package_page',
+    'access arguments' => array('access content'),
+    'title' => 'Dataset',
+    'page arguments' => array(1),
+  );
+  $items['admin/config/development/opendata_package'] = array(
+    'title' => 'CKAN Drupal Module',
+    'description' => 'Configuration for CKAN Drupal Module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('opendata_package_admin_form'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_node_info().
+ *
+ * We use hook_node_info() to define our node content type.
+ */
+function opendata_package_node_info() {
+  // We define the node type as an associative array.
+  return array(
+    'opendata_package' => array(
+      'name' => t('Canada Open Data Node Type'),
+      // 'base' tells Drupal the base string for hook functions.
+      // This is often the module name; if base is set to 'mymodule',
+      // Drupal would call mymodule_insert() or similar for node
+      // hooks. In our case, the base is 'opendata_package'.
+      'base' => 'opendata_package',
+      'description' => t('This node links to a CKAN Dataset.'),
+      'has_title' => '1',
+      'title_label' => t('Package name'),
+      // We'll set the 'locked' attribute to TRUE, so users won't be
+      // able to change the machine name of our content type.
+      'locked' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implement hook_form().
+ *
+ * Drupal needs for us to provide a form that lets the user
+ * add content. This is the form that the user will see if
+ * they go to node/add/opendata_package.
+ */
+function opendata_package_form($node, $form_state) {
+  return node_content_form($node, $form_state);
+}
+
+function opendata_package_admin_form($form, &$form_state) {
+  
+  $form['opendata_package_prefix'] = array (
+    '#type' => 'textfield',
+    '#title' => t('CKAN dataset URL prefix'),
+    '#default_value' => variable_get('opendata_package_prefix', '/data/%s/dataset/'),
+    '#size' => 20,
+    '#maxlength' => 132,
+    '#description' => t('The URL prefix prepended to the CKAN dataset link. Include "%s" which will be replaced with the language code'),
+    '#required' => TRUE,
+  );
+  return system_settings_form($form);
+}
+
+function _opendata_package_page($arg1 = NULL) {
+  global $user;
+  global $language;
+  
+  /* Check the package table to determine if the requested package exists.
+   * If it does not, then return an error message. If it does exist then 
+   * determine if a node has been previously associated with the package.
+   * If one has, then return the node.
+   * 
+   * If no node has been associated with the package, then create the node, and
+   * associate it with the package.
+   */
+   
+   if ( is_null($arg1) ) {
+        // We will just show a standard "access denied" page in this case.
+        drupal_access_denied();
+        return;  // We actually don't get here.
+    }
+   $renderable_array = array();
+   
+   // Retrieve info from package. If it exists, only one record will be returned
+   $result = db_select('opendata_package', 'c')
+    ->fields('c', array('pkg_node_id', 'pkg_id', 'pkg_name', 'pkg_title_en', 
+        'pkg_title_fr', 'pkg_description_en', 'pkg_description_fr'))
+    ->condition('pkg_name', $arg1, '=')
+    ->execute();
+    
+    if ($result->rowCount() == 1) { // package exists
+        $record = $result->fetchAssoc();
+        $nid = $record['pkg_node_id'];
+        $node = NULL;
+        if ($nid != 0) { // node already exists - use it
+            $node = node_load($nid);
+        } else { // need to create a node
+ 
+            $node = new stdClass();
+            $node->type = 'opendata_package';
+            
+            // This is the node title, but the node template will show the package titles from CKAN that
+            // are stored in the opendata_package table.
+            $node->title = $record['pkg_title_en'];
+            $node->opendata_package_title['en'][0]['value'] =  $record['pkg_title_en'];
+            $node->opendata_package_title['fr'][0]['value'] =  $record['pkg_title_fr'];
+            node_object_prepare($node);
+            $node->language = $language->language; 
+            $node->uid = $user->uid;
+            $node->comment = 2;
+            $node->path['alias'] = 'dataset/' . $record['pkg_name'];
+            $node = node_submit($node);
+            node_save($node);
+            
+            // Save the node ID to OD_PACKAGE
+            $record['pkg_node_id'] = $node->nid;
+            $count = db_update('opendata_package')
+              ->fields($record)
+              ->condition('pkg_name', $record['pkg_name'], '=')
+              ->execute();
+            $node->tnid = $node->nid;
+            node_save($node);
+            
+            // Create and save the French node
+            $nodefr = new stdClass();
+            $nodefr->type = 'opendata_package';
+            $nodefr->title = $record['pkg_title_fr'];
+            $nodefr->od_package_title['fr'][0]['value'] =  $record['pkg_title_fr'];
+            node_object_prepare($nodefr);
+            $nodefr->language = 'fr';
+            $nodefr->tnid = $node->nid;
+            $nodefr->uid = $user->uid;
+            $nodefr->comment = 2;
+            $nodefr->path['alias'] = 'dataset/' . $record['pkg_name'];
+            $nodefr = node_submit($nodefr);
+            node_save($nodefr);
+
+        }
+        // Go to the new or existing view of the node
+        drupal_goto($GLOBALS['base_url'] . '/dataset/' . $record['pkg_name']);
+
+    } else { // package does not exist - just return an error
+      drupal_set_message(t('This dataset does not exist.'), 'warning');
+    };
+    return $renderable_array;       
+
+}
+
+function opendata_package_preprocess_page(&$variables) {
+  global $language;
+   
+  if (!empty($variables['node'])) {
+    
+    $node = $variables['node'];
+    if ($node->type == 'opendata_package') {
+      // Retrieve info from package. If it exists, only one record will be returned
+      $result = db_select('opendata_package', 'c')
+       ->fields('c', array('pkg_title_en', 'pkg_title_fr'))
+       ->condition('pkg_node_id', $node->nid, '=')
+       ->execute();
+      if ($result->rowCount() == 1) { // package exists
+        $record = $result->fetchAssoc();
+
+        if ($language->language == 'fr') {
+           $variables['title'] = check_plain($record['pkg_title_fr']);
+         } else {
+           $variables['title'] = check_plain($record['pkg_title_en']);
+         }
+      }
+    }
+  }
+}
+
