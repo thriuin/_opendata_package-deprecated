@@ -34,6 +34,12 @@ function opendata_package_menu() {
  * Implements hook_node_info().
  *
  * We use hook_node_info() to define our node content type.
+ * 
+ * @TODO This section is incomplete. The Drupal WET distro expects
+ * several other settings which are not currently being set here,
+ * including:
+ *   Multilingual support (enabled, with translation)
+ *   Disable display of author and date.
  */
 function opendata_package_node_info() {
   // We define the node type as an associative array.
@@ -120,18 +126,17 @@ function _opendata_package_page($arg1 = NULL) {
             
             // This is the node title, but the node template will show the package titles from CKAN that
             // are stored in the opendata_package table.
-            $node->title = $record['pkg_title_en'];
-            $node->opendata_package_title['en'][0]['value'] =  $record['pkg_title_en'];
-            $node->opendata_package_title['fr'][0]['value'] =  $record['pkg_title_fr'];
+            $node->title = utf8_encode(substr($record['pkg_title_en'], 0, 254));
+            $node->opendata_package_title['en'][0]['value'] = mb_convert_encoding(substr($record['pkg_title_en'], 0, 254), 'UTF-8');
             node_object_prepare($node);
             $node->language = $language->language; 
             $node->uid = $user->uid;
             $node->comment = 2;
-            $node->path['alias'] = 'dataset/' . $record['pkg_name'];
+            $node->path['alias'] = 'dataset/' . mb_convert_encoding(substr($record['pkg_id'], 0, 254), 'UTF-8');
             $node = node_submit($node);
             node_save($node);
             
-            // Save the node ID to OD_PACKAGE
+            // Save the node ID to OPENDATA_PACKAGE
             $record['pkg_node_id'] = $node->nid;
             $count = db_update('opendata_package')
               ->fields($record)
@@ -143,20 +148,20 @@ function _opendata_package_page($arg1 = NULL) {
             // Create and save the French node
             $nodefr = new stdClass();
             $nodefr->type = 'opendata_package';
-            $nodefr->title = $record['pkg_title_fr'];
-            $nodefr->od_package_title['fr'][0]['value'] =  $record['pkg_title_fr'];
+            $nodefr->title = mb_convert_encoding(substr($record['pkg_title_fr'], 0, 254), 'UTF-8');
+            $nodefr->od_package_title['fr'][0]['value'] = mb_convert_encoding(substr($record['pkg_title_fr'], 0, 254), 'UTF-8');
             node_object_prepare($nodefr);
             $nodefr->language = 'fr';
             $nodefr->tnid = $node->nid;
             $nodefr->uid = $user->uid;
             $nodefr->comment = 2;
-            $nodefr->path['alias'] = 'dataset/' . $record['pkg_name'];
+            $nodefr->path['alias'] = 'dataset/' . mb_convert_encoding(substr($record['pkg_id'], 0, 254), 'UTF-8');
             $nodefr = node_submit($nodefr);
             node_save($nodefr);
 
         }
         // Go to the new or existing view of the node
-        drupal_goto($GLOBALS['base_url'] . '/dataset/' . $record['pkg_name']);
+        drupal_goto($GLOBALS['base_url'] . '/dataset/' . $record['pkg_id']);
 
     } else { // package does not exist - just return an error
       drupal_set_message(t('This dataset does not exist.'), 'warning');
